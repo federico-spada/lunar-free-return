@@ -38,7 +38,7 @@ def propagate(sv0_,t0,dt,N_times,ref="earth"):
     # initialize simulation
     sim.t = t_initial
     extras = assist.Extras(sim, ephem)
-    sim.ri_ias15.min_dt = 1e-3
+    sim.ri_ias15.min_dt = 1e-2
     forces = extras.forces
     forces.remove("NON_GRAVITATIONAL")
     extras.forces = forces
