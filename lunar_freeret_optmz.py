@@ -19,8 +19,6 @@ D = 384.4e3 # km
 Re = 6378. # km
 Rm = 1737. # km
 
-crd = np.pi/180
-
 def propagate(sv0_,t0,dt,N_times,ref="earth"):
     # extremes of integration
     t_initial = t0 + et0/days
@@ -38,9 +36,14 @@ def propagate(sv0_,t0,dt,N_times,ref="earth"):
     # initialize simulation
     sim.t = t_initial
     extras = assist.Extras(sim, ephem)
-    sim.ri_ias15.min_dt = 1e-2
+    sim.ri_ias15.min_dt = 0.05
+    # include or not specific perturbations
     forces = extras.forces
     forces.remove("NON_GRAVITATIONAL")
+    #forces.remove("ASTEROIDS")
+    #forces.remove("SUN_HARMONICS")
+    #forces.remove("EARTH_HARMONICS")
+    #forces.remove("GR_EIH")
     extras.forces = forces
     # prepare for integration 
     times = np.linspace(t_initial,t_final,N_times)
@@ -49,7 +52,7 @@ def propagate(sv0_,t0,dt,N_times,ref="earth"):
     for i, t in enumerate(times):
         extras.integrate_or_interpolate(t)
         earth = ephem.get_particle("earth", t)
-        # geocentric output in km, km/s 
+        # Note that output is geocentric, in km, km/s 
         state_vector[i,:3] = ( np.array(sim.particles[0].xyz) 
                            -   np.array(earth.xyz) )*au
         state_vector[i,3:] = ( np.array(sim.particles[0].vxyz) 
@@ -75,8 +78,7 @@ def setup(x,N1=25,N2=25,N3=25,N4=25):
 def integrate_trajectory(segments):
     y = [] 
     for i, s in enumerate(segments):
-        elts = (s['rp'], s['ecc'], s['inc'], s['LAN'], s['arp'], s['M'], 
-                s['t0'], s['mu'])
+        elts = (s['rp'],s['ecc'],s['inc'],s['LAN'],s['arp'],s['M'],s['t0'],s['mu'])
         y0 = spice.conics(elts, s['t0'])
         y0[3:6] = y0[3:6]*( 1. + s['DV0']/np.linalg.norm(y0[3:6]) )
         ys = propagate(y0,s['t0'],s['dt'],s['Npt'],ref=s['ref'])
@@ -84,39 +86,38 @@ def integrate_trajectory(segments):
     return y  
 
 def obj_fun(x):
-    return x[5]
+    return x[5]*xm[5]
 
 def obj_jac(x):
     oj = np.zeros(len(x))
-    oj[5] = 1.0
+    oj[5] = 1.0*xm[5]
     return oj
 
 def obj_hess(x):
     return np.zeros(len(x))
 
 def c_eq(x):
-    segments = setup(x)
+    segments = setup(x*xm)
     sv1, sv2, sv3, sv4 = integrate_trajectory(segments)
     return np.r_[ sv1[-1,:]-sv4[-1,:], sv2[-1,:]-sv3[-1,:] ]
 
-def callback(x,ss):
-    if np.mod(ss.nit, 10) == 0:
-       display(x)
-
 def display(x):
     xd = x.copy()
-    xd[[1,2,3,7,8,9,14,15,16]] = np.mod(x[[1,2,3,7,8,9,14,15,16]]/crd, 360)
+    # convert angles to degrees
+    xd[[2,3,8,9,15,16]] = np.mod(np.rad2deg(x[[2,3,8,9,15,16]]), 360)
+    # inclinations are in [0, 180]
+    xd[[1,7,14]] = np.mod(np.rad2deg(x[[1,7,14]]), 180)
     print('===================================================================')  
     print('              s1              s2              s3              s4')
     print('===================================================================')
-    print(('t0 '+4*'%16.5f') % (t00,xd[5], xd[11], xd[11]))
-    print(('dt '+4*'%16.5f') % (xd[0], xd[6], xd[12], xd[17]))
-    print(('q  '+4*'%16.1f') % (rp_tli, rp_tei, rp_m , rp_m ))
-    print(('e  '+4*'%16.5f') % (0.0, 0.0, xd[13], xd[13]))
-    print(('i  '+4*'%16.5f') % (xd[1], xd[7], xd[14], xd[14]))
-    print(('Ω  '+4*'%16.5f') % (xd[2], xd[8], xd[15], xd[15]))
-    print(('ω  '+4*'%16.5f') % (0.0, 0.0, xd[16], x[16]))
-    print(('M  '+4*'%16.5f') % (xd[3], xd[9], 0.0 , 0.0 ))
+    print(('t0 '+4*'%16.5f') % (t00   , xd[5] , xd[11], xd[11]))
+    print(('dt '+4*'%16.5f') % (xd[0] , xd[6] , xd[12], xd[17]))
+    print(('q  '+4*'%16.1f') % (rp_tli, rp_tei, rp_m  , rp_m  ))
+    print(('e  '+4*'%16.5f') % (0.0   , 0.0   , xd[13], xd[13]))
+    print(('i  '+4*'%16.5f') % (xd[1] , xd[7] , xd[14], xd[14]))
+    print(('Ω  '+4*'%16.5f') % (xd[2] , xd[8] , xd[15], xd[15]))
+    print(('ω  '+4*'%16.5f') % (0.0   , 0.0   , xd[16], xd[16]))
+    print(('M  '+4*'%16.5f') % (xd[3] , xd[9] , 0.0   , 0.0 ))
     print(('∆V0%16.5f%16.5f         N/A             N/A') % (xd[4], xd[10]))
     print('===================================================================')
 
@@ -133,8 +134,6 @@ if __name__ == '__main__':
     ### reference epoch 
     epoch0 = '2009-4-3 00:00:00 UTC'
     et0 = spice.str2et(epoch0)
-    #epoch0 = '2020-5-4 12:00:00 UTC'
-    #et0 = spice.str2et(epoch0) - 2.888*days
 
     # fixed parameters 
     t00 = 0.0
@@ -146,10 +145,9 @@ if __name__ == '__main__':
     x0 = np.array([ 1.0, 0.0, 0.0, 0.0, 3.2,  8.0, -1.0, np.pi/4, 0.0, 0.0, 3.2,
                     4.0, 1.0, 1.0, 0.0, np.pi, 0.0,  -1.0 ])
 
-    #x0 = np.array([ 1.88838209,  0.66678157, -0.2259904 , -0.0530883 ,  3.14203396,
-    #    7.59221133, -1.88240663,  0.11505741,  0.98316457, -1.42867853,
-    #    3.13799639,  3.61242107,  2.09738364,  2.66275911,  2.65398911,
-    #    2.61048846, -0.15247821, -1.72403897])
+    # scaling values (modify with caution!)
+    xm = np.array([4, np.pi, 2*np.pi, 2*np.pi, 3.3, 12, 4, np.pi, 2*np.pi, 2*np.pi, 3.3,
+                   8, 4, 5, np.pi, 2*np.pi, 2*np.pi, 4])
 
     ### constraints 
     # non-linear, equality (continuity at s1--s4, s2--s3 boundaries)  
@@ -158,32 +156,31 @@ if __name__ == '__main__':
     Aeq = np.zeros((2,18))
     Aeq[0,0], Aeq[0,11], Aeq[0,17] = 1., -1., -1.
     Aeq[1,5], Aeq[1,6], Aeq[1,11], Aeq[1,12] = 1., 1., -1., -1.
-    lin_eq_cn = LinearConstraint( Aeq, np.repeat(0.,2), np.repeat(0.,2))
+    lin_eq_cn = LinearConstraint( Aeq*xm, np.repeat(0.,2), np.repeat(0.,2))
     # linear, inequality (minimum TOF's of segments)
     Ane = np.zeros((4,18))
     Ane[0,0], Ane[1,6], Ane[2,12], Ane[3,17] = 1., -1., 1., -1.
-    lin_ne_cn = LinearConstraint( Ane, np.repeat(1.,4), np.repeat(np.inf,4) )
+    lin_ne_cn = LinearConstraint( Ane*xm, np.repeat(1.,4), np.repeat(np.inf,4) )
     cons = (lin_ne_cn, lin_eq_cn, nln_eq_con)
 
     ### optimizer options
-    opts = {'disp': True, 'verbose': 2, 'maxiter': 5, 
-            'factorization_method':'SVDFactorization'}
+    opts = {'disp': True, 'verbose': 2, 'maxiter': 30}
 
     ### call the optimizer
-    res = minimize( obj_fun, x0, jac=obj_jac, hess=obj_hess, method='trust-constr', 
-                    options=opts, constraints=cons, )
+    res = minimize( obj_fun, x0/xm, jac=obj_jac, hess=obj_hess, method='trust-constr', 
+                    options=opts, constraints=cons)
     xf = res.x
-    #xf = x0
 
     display(xf)
 
     ### plot trajectory
     # construct optimized trajectory
-    ss = setup(xf,N1=150,N2=150,N3=50,N4=50)
+    ss = setup(xf*xm,N1=150,N2=150,N3=50,N4=50)
     sv1, sv2, sv3, sv4 = integrate_trajectory(ss)
-    etm = et0 + np.linspace(0,xf[5])*days 
+    etm = et0 + np.linspace(0,xf[5]*xm[5])*days 
     rm, _ = spice.spkpos('301', etm, 'J2000', 'NONE', '399')
-    plt.ion()
+    #plt.ion()
+    plt.figure()
     plt.close()
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
