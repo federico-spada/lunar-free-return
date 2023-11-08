@@ -102,7 +102,7 @@ def c_eq(x):
     return np.r_[ sv1[-1,:]-sv4[-1,:], sv2[-1,:]-sv3[-1,:] ]
 
 def display(x):
-    xd = x.copy()
+    xd = x.copy() * xm
     # convert angles to degrees
     xd[[2,3,8,9,15,16]] = np.mod(np.rad2deg(x[[2,3,8,9,15,16]]), 360)
     # inclinations are in [0, 180]
