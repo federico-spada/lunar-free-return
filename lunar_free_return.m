@@ -73,7 +73,7 @@ is = [1*ones(length(t1),1); 2*ones(length(t2),1); ...
 figure(1)
 clf
 % Earth
-plot3(0,0,0,'b.','markersize',10)
+earth_sphere;
 hold on
 % optimized trajectory
 for i=1:4
@@ -85,10 +85,10 @@ tm = linspace(0,x(6))*days;
 [rm_, ~] = cspice_spkpos('301', et0+tm, 'J2000', 'NONE', '399');
 plot3(rm_(1,:),rm_(2,:),rm_(3,:),'-','color',[.7 .7 .7])
 % SoI of the Moon
-[X,Y,Z] = sphere(20);
-[rmo_, ~] = cspice_spkpos('301', et0+x(12)*days, 'J2000', 'NONE', '399');
-mesh(R_S*X + rmo_(1),R_S*Y + rmo_(2),R_S*Z + rmo_(3),...
-'FaceAlpha','0.2','EdgeColor','k');
+%[X,Y,Z] = sphere(20);
+%[rmo_, ~] = cspice_spkpos('301', et0+x(12)*days, 'J2000', 'NONE', '399');
+%mesh(R_S*X + rmo_(1),R_S*Y + rmo_(2),R_S*Z + rmo_(3),...
+%'FaceAlpha','0.2','EdgeColor','k');
 %
 hold off
 grid on
@@ -103,7 +103,7 @@ legend('','S1: outbound','S2: inbound',...
 figure(2)
 clf
 % Earth
-plot3(0,0,0,'b.','markersize',10)
+earth_sphere;
 hold on
 % optimized trajectory
 [svm, lt] = cspice_spkezr('301', et0+ts', 'J2000', 'NONE', '399');
