@@ -5,8 +5,5 @@
 
    KERNELS_TO_LOAD=(
    '$PATH/naif0012.tls',
-   '$PATH/de440.bsp',
-   '$PATH/pck00010.tpc',
-   '$PATH/earth_latest_high_prec.bpc',
-   '$PATH/earth_720101_070426.bpc')
+   '$PATH/de440.bsp')
 \begintext
