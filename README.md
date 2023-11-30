@@ -1,4 +1,4 @@
-# lunar-free-return
+# lunar_free_return
 
 Trajectory optimization code to construct a lunar free-return trajectory. MATLAB and Python version.
 
